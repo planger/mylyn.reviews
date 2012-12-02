@@ -573,7 +573,7 @@ public class GerritClient {
 			}
 		}
 		// the "self" alias is only supported in Gerrit 2.5 and later
-		return executeQueryRest(monitor, "is:open owner:self reviewer:self");
+		return executeQueryRest(monitor, "is:open AND (owner:self OR reviewer:self)"); //$NON-NLS-1$
 	}
 
 	/**
