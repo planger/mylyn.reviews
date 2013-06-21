@@ -74,6 +74,11 @@ public abstract class PatchSetContentRemoteFactory<RemoteKeyType> extends
 		return content;
 	}
 
+	@Override
+	public void push(PatchSetContent remoteObject, IProgressMonitor monitor) throws CoreException {
+		//noop, push not supported in Gerrit
+	}
+
 	boolean addComments(IReviewItemSet set, IFileVersion version, List<PatchLineComment> comments,
 			AccountInfoCache accountInfoCache) {
 		version.getComments().clear();

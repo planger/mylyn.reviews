@@ -53,7 +53,7 @@ public class JobRemoteService extends AbstractRemoteService {
 	@Override
 	public void retrieve(final AbstractRemoteConsumer process, final boolean force) {
 		if (process.isAsynchronous()) {
-			final Job job = new Job(process.getDescription()) {
+			final Job job = new Job("[Pull]" + process.getDescription()) {
 				@Override
 				protected IStatus run(IProgressMonitor monitor) {
 					try {
@@ -82,11 +82,6 @@ public class JobRemoteService extends AbstractRemoteService {
 				}
 			});
 			addJob(job);
-//			if (process.isSystemJob()) {
-//				job.setSystem(true);
-//			} else if (process.isUserJob()) {
-//				job.setUser(true);
-//			}
 			job.schedule();
 		} else {
 			try {
@@ -101,6 +96,68 @@ public class JobRemoteService extends AbstractRemoteService {
 					process.notifyDone(Status.OK_STATUS);
 				}
 			});
+		}
+	}
+
+	/**
+	 * Fully implements the {@link AbstractRemoteService#send(AbstractRemoteConsumer, boolean)} contract:
+	 * <ol>
+	 * <li>Invokes {@link AbstractRemoteConsumer#applyRemote(org.eclipse.core.runtime.IProgressMonitor)} inside of a
+	 * modelExec call, so that extending classes can manage thread context.</li>
+	 * <li>If {@link AbstractRemoteConsumer#isAsynchronous()}, creates and runs a job to
+	 * {@link AbstractRemoteConsumer#pull(org.eclipse.core.runtime.IProgressMonitor)} the remote API data. Otherwise,
+	 * simply calls pull.</li>
+	 * <li>If a failure occurs, calls {@link AbstractRemoteConsumer#notifyDone(org.eclipse.core.runtime.IStatus)}.</li>
+	 * <li>(No notification occurs in the case of an error while applying.)</li>
+	 * </ol>
+	 */
+	@Override
+	public void send(final AbstractRemoteConsumer process, final boolean force) {
+		if (process.isAsynchronous()) {
+			modelExec(new Runnable() {
+				public void run() {
+					process.applyRemote(force);
+					final Job job = new Job("[Push]" + process.getDescription()) {
+						@Override
+						protected IStatus run(IProgressMonitor monitor) {
+							try {
+								process.push(force, monitor);
+							} catch (CoreException e) {
+								return new Status(IStatus.WARNING, "org.eclipse.mylyn.reviews.core",
+										"Couldn't push model.", e);
+							} catch (OperationCanceledException e) {
+								return Status.CANCEL_STATUS;
+							}
+							return Status.OK_STATUS;
+						}
+					};
+					job.addJobChangeListener(new JobChangeAdapter() {
+						@Override
+						public void done(final IJobChangeEvent event) {
+							modelExec(new Runnable() {
+								public void run() {
+									process.notifyDone(event.getResult());
+								}
+							}, false);
+						}
+					});
+					addJob(job);
+					job.schedule();
+				}
+			}, false);
+		} else {
+			modelExec(new Runnable() {
+				public void run() {
+					process.applyRemote(force);
+				}
+			}, true);
+			try {
+				process.push(force, new NullProgressMonitor());
+			} catch (CoreException e) {
+				process.notifyDone(e.getStatus());
+				return;
+			}
+			process.notifyDone(Status.OK_STATUS);
 		}
 	}
 

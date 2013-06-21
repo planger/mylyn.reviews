@@ -47,6 +47,11 @@ public class PatchSetDetailRemoteFactory extends ReviewItemSetRemoteFactory<Patc
 	}
 
 	@Override
+	public void push(PatchSetDetail remoteObject, IProgressMonitor monitor) throws CoreException {
+		//noop, push not supported in Gerrit
+	}
+
+	@Override
 	public boolean isAsynchronous() {
 		return false;
 	}

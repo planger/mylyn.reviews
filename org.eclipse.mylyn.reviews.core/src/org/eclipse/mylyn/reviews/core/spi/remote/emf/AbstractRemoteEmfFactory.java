@@ -20,7 +20,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.emf.ecore.EAttribute;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EReference;
-import org.eclipse.mylyn.reviews.core.model.IReview;
 import org.eclipse.mylyn.reviews.core.spi.remote.AbstractRemoteService;
 
 /**
@@ -396,6 +395,36 @@ public abstract class AbstractRemoteEmfFactory<EParentObjectType extends EObject
 	}
 
 	/**
+	 * Override to perform actual push to remote API. This request is fully managed by remote service and could be
+	 * invoked directly, but is typically invoked through a consumer.
+	 * <em>This method may block or fail, and must not be called from UI thread.</em>
+	 * 
+	 * @param parentObject
+	 *            The object that contains the model object
+	 * @param remoteKey
+	 *            A unique identifier in the target API
+	 * @param monitor
+	 * @throws CoreException
+	 */
+	public abstract void push(RemoteType remoteObject, IProgressMonitor monitor) throws CoreException;
+
+	/**
+	 * Override to return true if the remote object state has changed and needs to update to remote API.
+	 * 
+	 * @param parentObject
+	 *            The object that contains the model object
+	 * @param modelObject
+	 *            The model object to test
+	 * @param remoteObject
+	 *            A unique identifier in the target API
+	 * @param monitor
+	 * @return
+	 */
+	public boolean isPushNeeded(EParentObjectType parent, EObjectType object, RemoteType remote) {
+		return false;
+	}
+
+	/**
 	 * Override to create an EObject from remote object. (Consumers should use
 	 * {@link #get(EParentObjectType parent, RemoteType remoteObject)}, which ensures that any cached objects will be
 	 * returned instead.)
@@ -427,8 +456,8 @@ public abstract class AbstractRemoteEmfFactory<EParentObjectType extends EObject
 
 	/**
 	 * Updates the values for the supplied EMF object based on any values that have changed in the remote object since
-	 * the last call to {@link #retrieve(String, EObject, EReference, Object)} or {@link #update(Object)}. The object
-	 * must have been previously retrieved using this factory.
+	 * the last call to {@link #pull(EObject, Object, IProgressMonitor)} or
+	 * {@link #updateModel(EObject, Object, Object)}. The object must have been previously retrieved using this factory.
 	 * <em>Must be called from EMF safe (e.g. UI) thread and should have very fast execution time.</em>
 	 * 
 	 * @param parentObject
@@ -438,6 +467,21 @@ public abstract class AbstractRemoteEmfFactory<EParentObjectType extends EObject
 	 * @return true if the object has changed or the object delta is unknown, false otherwise
 	 */
 	public boolean updateModel(EParentObjectType parentObject, EObjectType modelObject, RemoteType remoteObject) {
+		return false;
+	}
+
+	/**
+	 * Updates the values for the remote object based on any values that have changed in model object since the last
+	 * call to {@link #updateRemote(Object)}.
+	 * <em>Must be called from EMF safe (e.g. UI) thread and should have very fast execution time.</em>
+	 * 
+	 * @param parentObject
+	 *            the parent EMF object that the new child object is referenced from
+	 * @param modelObject
+	 *            The model object to update -- must currently exist in the parent
+	 * @return true if the remote object has changed or the object delta is unknown, false otherwise
+	 */
+	public boolean updateRemote(EParentObjectType parentObject, EObjectType modelObject, RemoteType remoteObject) {
 		return false;
 	}
 

@@ -60,6 +60,27 @@ public interface IRemoteEmfObserver<EParentObjectType extends EObject, EObjectTy
 	void updating(EParentObjectType parentObject, EObjectType modelObject);
 
 	/**
+	 * Called whenever a remote API's state has been updated from the remote object
+	 * 
+	 * @param parentObject
+	 *            The parent of the supplied object
+	 * @param modelObject
+	 *            The sent object
+	 */
+	void sent(EParentObjectType parentObject, EObjectType modelObject);
+
+	/**
+	 * Called whenever a model object beings sending it's state to a remote object.
+	 * {@link RemoteEmfConsumer#send(boolean)}.
+	 * 
+	 * @param parentObject
+	 *            The parent of the supplied object
+	 * @param modelObject
+	 *            The object being sent
+	 */
+	void sending(EParentObjectType parentObject, EObjectType modelObject);
+
+	/**
 	 * Called whenever a failure has occurred while attempting to retrieve a remote object.
 	 * 
 	 * @param parentObject

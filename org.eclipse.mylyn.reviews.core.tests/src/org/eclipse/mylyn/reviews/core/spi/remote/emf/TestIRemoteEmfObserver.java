@@ -27,6 +27,8 @@ final class TestIRemoteEmfObserver<P extends EObject, T, L, C> implements IRemot
 
 	int responded;
 
+	int sent;
+
 	IStatus failure;
 
 	AbstractRemoteEmfFactory<P, T, ?, ?, L, C> factory;
@@ -42,6 +44,15 @@ final class TestIRemoteEmfObserver<P extends EObject, T, L, C> implements IRemot
 	public void updating(P parent, T object) {
 	}
 
+	public void sent(P parentObject, T modelObject) {
+		responded++;
+		sent++;
+	}
+
+	@Override
+	public void sending(P parentObject, T modelObject) {
+	}
+
 	public void updated(P object, T child, boolean modified) {
 		responded++;
 		if (modified) {
@@ -53,11 +64,15 @@ final class TestIRemoteEmfObserver<P extends EObject, T, L, C> implements IRemot
 		failure = status;
 	}
 
-	protected void waitForResponse(int response, int update) {
+	protected void waitForResponse(int expectedResponses, int expectedUpdate) {
+		waitForResponse(expectedResponses, expectedUpdate, 0);
+	}
+
+	protected void waitForResponse(int expectedResponses, int expectedUpdate, int expectedSents) {
 		long delay;
 		delay = 0;
 		while (delay < TEST_TIMEOUT) {
-			if (responded < response) {
+			if (responded < expectedResponses || updated < expectedUpdate || sent < expectedSents) {
 				try {
 					Thread.sleep(10);
 					delay += 10;
@@ -69,11 +84,13 @@ final class TestIRemoteEmfObserver<P extends EObject, T, L, C> implements IRemot
 		}
 		try {
 			//wait extra to ensure there aren't remaining jobs
-			Thread.sleep(100);
+			Thread.sleep(25);
 		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
-		assertThat("Wrong # responses", responded, is(response));
-		assertThat("Wrong # updates", updated, is(update));
+		assertThat("Wrong # responses: " + responded + ", updated: " + updated, responded, is(expectedResponses));
+		assertThat("Wrong # updates" + updated, updated, is(expectedUpdate));
+		assertThat("Wrong # sents" + sent, sent, is(expectedSents));
 		if (factory != null) {
 			assertThat(factory.getService().isActive(), is(false));
 		}

@@ -48,6 +48,11 @@ public class GerritUserRemoteFactory extends
 	}
 
 	@Override
+	public void push(AccountInfo remoteObject, IProgressMonitor monitor) throws CoreException {
+		//noop, push not supported in Gerrit
+	}
+
+	@Override
 	public IUser createModel(IRepository repository, AccountInfo info) {
 		IUser user = IReviewsFactory.INSTANCE.createUser();
 		user.setId(info.getId() + "");

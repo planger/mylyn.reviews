@@ -70,6 +70,17 @@ public interface RemoteNotification extends Notification {
 	int REMOTE_FAILURE = 1014;
 
 	/**
+	 * An {@link Notification#getEventType event type} indicating that the object is in the process of sending an update
+	 * to the remote source.
+	 */
+	int REMOTE_SENDING = 1020;
+
+	/**
+	 * An {@link Notification#getEventType event type} indicating that the remote source has just been updated.
+	 */
+	int REMOTE_SEND = 1021;
+
+	/**
 	 * Returns true if a remote operation has just completed. This is true for REMOTE_MEMBER_UPDATE,
 	 * REMOTE_MEMBER_FAILURE, REMOTE_UPDATE and REMOTE_FAILURE.
 	 * 

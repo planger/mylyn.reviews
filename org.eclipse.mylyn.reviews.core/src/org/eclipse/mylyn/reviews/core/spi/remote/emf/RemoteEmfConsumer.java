@@ -17,6 +17,7 @@ import java.util.Collection;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Status;
 import org.eclipse.emf.common.notify.Notification;
 import org.eclipse.emf.common.notify.NotificationChain;
 import org.eclipse.emf.common.notify.impl.AdapterImpl;
@@ -59,6 +60,8 @@ public class RemoteEmfConsumer<EParentObjectType extends EObject, EObjectType, L
 
 	private boolean retrieving;
 
+	private boolean sending;
+
 	boolean userJob;
 
 	boolean systemJob;
@@ -90,6 +93,12 @@ public class RemoteEmfConsumer<EParentObjectType extends EObject, EObjectType, L
 							case RemoteNotification.REMOTE_MEMBER_UPDATE:
 							case RemoteNotification.REMOTE_UPDATE:
 								listener.updated(parentObject, modelObject, remoteMessage.isModification());
+								break;
+							case RemoteNotification.REMOTE_SENDING:
+								listener.sending(parentObject, modelObject);
+								break;
+							case RemoteNotification.REMOTE_SEND:
+								listener.sent(parentObject, modelObject);
 								break;
 							case RemoteNotification.REMOTE_MEMBER_FAILURE:
 							case RemoteNotification.REMOTE_FAILURE:
@@ -193,6 +202,44 @@ public class RemoteEmfConsumer<EParentObjectType extends EObject, EObjectType, L
 		return pulling;
 	}
 
+	@Override
+	public void push(boolean force, IProgressMonitor monitor) throws CoreException {
+		if (remoteObject == null) {
+			throw new CoreException(new Status(IStatus.ERROR, "org.eclipse.mylyn.reviews.core",
+					"Tried to push without a remote object!"));
+		}
+		if (modelObject == null) {
+			throw new CoreException(new Status(IStatus.ERROR, "org.eclipse.mylyn.reviews.core",
+					"Tried to push without a model object!"));
+		}
+		if (modelObject instanceof EObject) {
+			getFactory().getService().modelExec(new Runnable() {
+				@Override
+				public void run() {
+					((EObject) modelObject).eNotify(new RemoteENotificationImpl((InternalEObject) modelObject,
+							RemoteNotification.REMOTE_SENDING, null, null));
+				}
+			});
+		}
+		if (factory.isPushNeeded(parentObject, modelObject, remoteObject)) {
+			factory.push(remoteObject, monitor);
+		}
+		if (modelObject instanceof EObject) {
+			getFactory().getService().modelExec(new Runnable() {
+				@Override
+				public void run() {
+					((EObject) modelObject).eNotify(new RemoteENotificationImpl((InternalEObject) modelObject,
+							RemoteNotification.REMOTE_SEND, null, null));
+				}
+			});
+		}
+	}
+
+	@Override
+	public void applyRemote(boolean force) {
+		factory.updateRemote(parentObject, modelObject, remoteObject);
+	}
+
 	/**
 	 * Apply the remote object to the local model object.
 	 * <em>This method must be called from the EMF managed (e.g.) UI thread.</em>
@@ -290,12 +337,29 @@ public class RemoteEmfConsumer<EParentObjectType extends EObject, EObjectType, L
 	}
 
 	/**
+	 * Performs a complete remote send, updating the remote value and then pushing it to the Remote API.
+	 * <ol>
+	 * 
+	 * @param force
+	 *            Forces update and push, even if factory methods
+	 *            {@link AbstractRemoteEmfFactory#isPushNeeded(EObject, Object, Object)} returns false.
+	 */
+	public void send(boolean force) {
+		if (sending) {
+			return;
+		}
+		sending = true;
+		getFactory().getService().send(this, force);
+	}
+
+	/**
 	 * Notifies the consumer that a failure has occurred while performing a retrieval. (Consumers should generally
 	 * handle update and failure notifications through the {@link IRemoteEmfObserver#failed(IStatus)} method instead.)
 	 */
 	@Override
 	public void notifyDone(IStatus status) {
 		retrieving = false;
+		sending = false;
 	}
 
 	/**

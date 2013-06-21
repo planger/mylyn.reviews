@@ -46,4 +46,8 @@ public class TestRemoteService extends AbstractRemoteService {
 	public void dispose() {
 	}
 
+	@Override
+	public void send(AbstractRemoteConsumer process, boolean force) {
+		//noop -- send not supported or tested
+	}
 }

@@ -50,6 +50,12 @@ public class RemoteEmfObserver<EParentObjectType extends EObject, EObjectType, L
 	public void updated(EParentObjectType parentObject, EObjectType modelObject, boolean modified) {
 	}
 
+	public void sent(EParentObjectType parentObject, EObjectType modelObject) {
+	}
+
+	public void sending(EParentObjectType parentObject, EObjectType modelObject) {
+	}
+
 	public void failed(EParentObjectType parentObject, EObjectType modelObject, IStatus status) {
 	}
 

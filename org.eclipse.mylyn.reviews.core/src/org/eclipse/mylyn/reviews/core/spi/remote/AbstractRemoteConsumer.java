@@ -36,6 +36,17 @@ public abstract class AbstractRemoteConsumer {
 	public abstract void pull(boolean force, IProgressMonitor monitor) throws CoreException;
 
 	/**
+	 * Override to perform the request against remote API, taking the state (e.g. as member(s) field of an implementing
+	 * class) and updating the remote server with it.
+	 * 
+	 * @param force
+	 *            push to remote even when API doesn't require
+	 * @param monitor
+	 * @throws CoreException
+	 */
+	public abstract void push(boolean force, IProgressMonitor monitor) throws CoreException;
+
+	/**
 	 * Override to apply the remotely obtained state to a local model object. This method is expected to execute
 	 * <em>very</em> quickly, as the typical implementation will occur on the UI thread.
 	 * 
@@ -44,6 +55,14 @@ public abstract class AbstractRemoteConsumer {
 	 * @throws CoreException
 	 */
 	public abstract void applyModel(boolean force);
+
+	/**
+	 * Override to update the remote state with the current contents of the model object. This method is expected to
+	 * execute <em>very</em> quickly, as the typical implementation will occur on the UI thread.
+	 * 
+	 * @throws CoreException
+	 */
+	public abstract void applyRemote(boolean force);
 
 	/**
 	 * Provides notification of failure. See {@link AbstractRemoteService#retrieve(AbstractRemoteProcess, boolean)} for

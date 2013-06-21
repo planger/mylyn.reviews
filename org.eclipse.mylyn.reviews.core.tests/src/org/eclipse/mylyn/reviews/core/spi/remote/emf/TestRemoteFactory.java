@@ -29,6 +29,8 @@ class TestRemoteFactory extends AbstractRemoteEmfFactory<EPackage, EClass, Strin
 
 	static Map<String, TestRemoteObject> remoteForKey = new HashMap<String, TestRemoteObject>();
 
+	static Map<TestRemoteObject, String> remoteValue = new HashMap<TestRemoteObject, String>();
+
 	Integer currentVal;
 
 	{
@@ -44,6 +46,16 @@ class TestRemoteFactory extends AbstractRemoteEmfFactory<EPackage, EClass, Strin
 	@Override
 	public TestRemoteObject pull(EPackage parent, String remoteKey, IProgressMonitor monitor) throws CoreException {
 		return remoteForKey.get(remoteKey);
+	}
+
+	@Override
+	public void push(TestRemoteObject remoteObject, IProgressMonitor monitor) throws CoreException {
+		remoteValue.put(remoteObject, remoteObject.data);
+	}
+
+	@Override
+	public boolean isPushNeeded(EPackage parent, EClass object, TestRemoteObject remote) {
+		return true;
 	}
 
 	@Override

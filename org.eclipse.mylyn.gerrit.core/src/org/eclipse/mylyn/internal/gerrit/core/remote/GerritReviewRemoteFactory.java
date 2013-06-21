@@ -144,6 +144,11 @@ public class GerritReviewRemoteFactory extends ReviewRemoteFactory<GerritChange,
 	}
 
 	@Override
+	public void push(GerritChange remoteObject, IProgressMonitor monitor) throws CoreException {
+		//noop, push not supported in Gerrit
+	}
+
+	@Override
 	public boolean isCreateModelNeeded(IRepository parentObject, IReview modelObject) {
 		return super.isCreateModelNeeded(parentObject, modelObject) || modelObject.getModificationDate() == null;
 	}

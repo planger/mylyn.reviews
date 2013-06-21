@@ -385,6 +385,12 @@ public class RemoteEmfFactoryTest {
 			// ignore
 			return null;
 		}
+
+		@Override
+		public void push(TestRemoteObject remoteObject, IProgressMonitor monitor) throws CoreException {
+			// ignore
+
+		}
 	}
 
 	@Test
@@ -499,5 +505,25 @@ public class RemoteEmfFactoryTest {
 		checkConsumer(harness.consumer, "remoteKeyFor Object 1", "Remote Object 1", "localKeyFor Object 1",
 				"Local Object 1");
 		assertThat(modelObject.getInstanceTypeName(), is("newData"));
+	}
+
+	@Test
+	public void testRemotePush() {
+		TestRemoteFactory.remoteValue.clear();
+		TestManagerHarness harness = new TestManagerHarness(new TestPullCreateOnlyFactory()) {
+			@Override
+			RemoteEmfConsumer<EPackage, EClass, String, TestRemoteObject, String, Integer> createConsumer() {
+				return factory.getConsumerForRemoteKey(parent, "remoteKeyFor Object 1");
+			}
+		};
+		harness.consumer.retrieve(false);
+		harness.listener.waitForResponse(1, 1);
+		checkConsumer(harness.consumer, "remoteKeyFor Object 1", "Remote Object 1", "localKeyFor Object 1",
+				"Local Object 1");
+		assertThat(TestRemoteFactory.remoteValue.get(TestRemoteFactory.remote1), nullValue());
+		TestRemoteFactory.remote1.data = "pushData";
+		harness.consumer.send(false);
+		harness.listener.waitForResponse(2, 1, 1);
+		assertThat(TestRemoteFactory.remoteValue.get(TestRemoteFactory.remote1), is("pushData"));
 	}
 }

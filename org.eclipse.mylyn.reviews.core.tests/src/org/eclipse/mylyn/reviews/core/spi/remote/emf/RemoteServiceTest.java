@@ -31,9 +31,13 @@ public class RemoteServiceTest {
 
 	class Consumer extends AbstractRemoteConsumer {
 
-		boolean retrieve;
+		boolean pull;
 
-		boolean apply;
+		boolean applyModel;
+
+		boolean push;
+
+		boolean applyRemote;
 
 		boolean notify;
 
@@ -43,12 +47,22 @@ public class RemoteServiceTest {
 
 		@Override
 		public void pull(boolean force, IProgressMonitor monitor) throws CoreException {
-			retrieve = true;
+			pull = true;
 		}
 
 		@Override
 		public void applyModel(boolean force) {
-			apply = true;
+			applyModel = true;
+		}
+
+		@Override
+		public void push(boolean force, IProgressMonitor monitor) throws CoreException {
+			push = true;
+		}
+
+		@Override
+		public void applyRemote(boolean force) {
+			applyRemote = true;
 		}
 
 		@Override
@@ -103,8 +117,8 @@ public class RemoteServiceTest {
 		remoteService.retrieve(consumer, false);
 		consumer.waitForDone();
 		assertThat(consumer.status.getSeverity(), is(IStatus.OK));
-		assertThat(consumer.retrieve, is(true));
-		assertThat(consumer.apply, is(true));
+		assertThat(consumer.pull, is(true));
+		assertThat(consumer.applyModel, is(true));
 	}
 
 	@Test
@@ -115,8 +129,8 @@ public class RemoteServiceTest {
 		remoteService.retrieve(consumer, false);
 		consumer.waitForDone();
 		assertThat(consumer.status.getSeverity(), is(IStatus.OK));
-		assertThat(consumer.retrieve, is(true));
-		assertThat(consumer.apply, is(true));
+		assertThat(consumer.pull, is(true));
+		assertThat(consumer.applyModel, is(true));
 	}
 
 	class BrokenConsumer extends Consumer {
@@ -133,8 +147,8 @@ public class RemoteServiceTest {
 		remoteService.retrieve(consumer, false);
 		consumer.waitForDone();
 		assertThat(consumer.status.getSeverity(), is(IStatus.WARNING));
-		assertThat(consumer.retrieve, is(false));
-		assertThat(consumer.apply, is(false));
+		assertThat(consumer.pull, is(false));
+		assertThat(consumer.applyModel, is(false));
 	}
 
 	@Test
@@ -145,8 +159,8 @@ public class RemoteServiceTest {
 		remoteService.retrieve(consumer, false);
 		consumer.waitForDone();
 		assertThat(consumer.status.getSeverity(), is(IStatus.ERROR));
-		assertThat(consumer.retrieve, is(false));
-		assertThat(consumer.apply, is(false));
+		assertThat(consumer.pull, is(false));
+		assertThat(consumer.applyModel, is(false));
 	}
 
 	Thread testThread;
@@ -155,58 +169,109 @@ public class RemoteServiceTest {
 
 		@Override
 		public void modelExec(Runnable runnable, boolean block) {
-			testThread = new Thread(runnable, "Test Thread");
-			testThread.start();
+			if (block) {
+				runnable.run();
+			} else {
+				testThread = new Thread(runnable, "Model Thread");
+				testThread.start();
+			}
 		}
 	}
 
 	class ModelThreadConsumer extends Consumer {
 
-		Thread modelThread;
+		Thread applyModelThread;
 
-		Thread retrieveThread;
+		Thread pullThread;
+
+		Thread applyRemoteThread;
+
+		Thread pushThread;
 
 		@Override
 		public void pull(boolean force, IProgressMonitor monitor) throws CoreException {
-			retrieveThread = Thread.currentThread();
+			pullThread = Thread.currentThread();
 			super.pull(force, monitor);
 		}
 
 		@Override
 		public void applyModel(boolean force) {
-			modelThread = Thread.currentThread();
+			applyModelThread = Thread.currentThread();
 			super.applyModel(force);
+		}
+
+		@Override
+		public void push(boolean force, IProgressMonitor monitor) throws CoreException {
+			pushThread = Thread.currentThread();
+			super.push(force, monitor);
+		}
+
+		@Override
+		public void applyRemote(boolean force) {
+			applyRemoteThread = Thread.currentThread();
+			super.applyRemote(force);
 		}
 	}
 
 	@Test
-	public void testExecuteModelThread() throws CoreException {
+	public void testExecuteModelThreadRetrieve() throws CoreException {
 		JobRemoteService remoteService = new ThreadedService();
 		ModelThreadConsumer consumer = new ModelThreadConsumer();
 		remoteService.retrieve(consumer, false);
 		consumer.waitForDone();
-		assertThat(consumer.modelThread.getName(), is("Test Thread"));
-		assertThat(consumer.retrieveThread.getName(), not("Test Thread"));
+		assertThat(consumer.applyModelThread.getName(), is("Model Thread"));
+		assertThat(consumer.pullThread.getName(), not("Model Thread"));
 		assertThat(consumer.status.getSeverity(), is(IStatus.OK));
-		assertThat(consumer.retrieve, is(true));
-		assertThat(consumer.apply, is(true));
+		assertThat(consumer.pull, is(true));
+		assertThat(consumer.applyModel, is(true));
 
-		assertThat(consumer.retrieveThread, not(Thread.currentThread()));
+		assertThat(consumer.pullThread, not(Thread.currentThread()));
 	}
 
 	@Test
-	public void testExecuteModelThreadSync() throws CoreException {
+	public void testExecuteModelThreadRetrieveSync() throws CoreException {
 		JobRemoteService remoteService = new ThreadedService();
 		ModelThreadConsumer consumer = new ModelThreadConsumer();
 		consumer.async = false;
 		remoteService.retrieve(consumer, false);
 		consumer.waitForDone();
-		assertThat(consumer.modelThread.getName(), is("Test Thread"));
-		assertThat(consumer.retrieveThread.getName(), not("Test Thread"));
+		assertThat(consumer.applyModelThread.getName(), is("main"));
+		assertThat(consumer.pullThread.getName(), not("Model Thread"));
 		assertThat(consumer.status.getSeverity(), is(IStatus.OK));
-		assertThat(consumer.retrieve, is(true));
-		assertThat(consumer.apply, is(true));
+		assertThat(consumer.pull, is(true));
+		assertThat(consumer.applyModel, is(true));
 
-		assertThat(consumer.retrieveThread, is(Thread.currentThread()));
+		assertThat(consumer.pullThread, is(Thread.currentThread()));
+	}
+
+	@Test
+	public void testExecuteModelThreadSend() throws CoreException {
+		JobRemoteService remoteService = new ThreadedService();
+		ModelThreadConsumer consumer = new ModelThreadConsumer();
+		remoteService.send(consumer, false);
+		consumer.waitForDone();
+		assertThat(consumer.applyRemoteThread.getName(), is("Model Thread"));
+		assertThat(consumer.pushThread.getName(), not("Model Thread"));
+		assertThat(consumer.status.getSeverity(), is(IStatus.OK));
+		assertThat(consumer.push, is(true));
+		assertThat(consumer.applyRemote, is(true));
+
+		assertThat(consumer.pullThread, not(Thread.currentThread()));
+	}
+
+	@Test
+	public void testExecuteModelThreadSendSync() throws CoreException {
+		JobRemoteService remoteService = new ThreadedService();
+		ModelThreadConsumer consumer = new ModelThreadConsumer();
+		consumer.async = false;
+		remoteService.send(consumer, false);
+		consumer.waitForDone();
+		assertThat(consumer.applyRemoteThread.getName(), is("main"));
+		assertThat(consumer.pushThread.getName(), not("Model Thread"));
+		assertThat(consumer.status.getSeverity(), is(IStatus.OK));
+		assertThat(consumer.push, is(true));
+		assertThat(consumer.applyRemote, is(true));
+
+		assertThat(consumer.pushThread, is(Thread.currentThread()));
 	}
 }
