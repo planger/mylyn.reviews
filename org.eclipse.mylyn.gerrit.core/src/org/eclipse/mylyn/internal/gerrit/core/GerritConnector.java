@@ -153,7 +153,7 @@ public class GerritConnector extends ReviewsConnector {
 
 	@Override
 	public String getLabel() {
-		return "Gerrit Code Review (supports 2.4 and later)";
+		return "Gerrit Code Review (supports 2.6.1 and later)";
 	}
 
 	@Override
