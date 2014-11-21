@@ -18,7 +18,7 @@ Export-Package: org.eclipse.mylyn.reviews.core.model;x-friends:="org.eclipse.myl
  org.eclipse.mylyn.reviews.core.spi.remote.emf;x-friends:="org.eclipse.mylyn.reviews.ui,org.eclipse.mylyn.reviews.edit",
  org.eclipse.mylyn.reviews.core.spi.remote.review;x-friends:="org.eclipse.mylyn.reviews.ui,org.eclipse.mylyn.reviews.edit",
  org.eclipse.mylyn.reviews.internal.core;x-internal:=true,
- org.eclipse.mylyn.reviews.internal.core.model;x-friends:="org.eclipse.mylyn.reviews.edit"
+ org.eclipse.mylyn.reviews.internal.core.model;x-friends:="org.eclipse.mylyn.reviews.edit,org.eclipse.mylyn.reviews.core.tests"
 Bundle-Vendor: Eclipse Mylyn
 Import-Package: org.apache.commons.io,
  org.apache.commons.lang

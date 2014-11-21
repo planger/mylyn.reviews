@@ -18,6 +18,7 @@ import static org.eclipse.mylyn.internal.gerrit.core.client.rest.ApprovalUtil.to
 import static org.eclipse.mylyn.internal.gerrit.core.remote.TestRemoteObserverConsumer.retrieveForRemoteKey;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -50,6 +51,8 @@ import org.eclipse.mylyn.internal.gerrit.core.client.rest.ChangeInfo;
 import org.eclipse.mylyn.reviews.core.model.IApprovalType;
 import org.eclipse.mylyn.reviews.core.model.IChange;
 import org.eclipse.mylyn.reviews.core.model.IComment;
+import org.eclipse.mylyn.reviews.core.model.IEmfModelLocation;
+import org.eclipse.mylyn.reviews.core.model.ILocation;
 import org.eclipse.mylyn.reviews.core.model.IRepository;
 import org.eclipse.mylyn.reviews.core.model.IRequirementEntry;
 import org.eclipse.mylyn.reviews.core.model.IReview;
@@ -518,6 +521,39 @@ public class GerritReviewRemoteFactoryTest extends GerritRemoteTest {
 		changeDetail = reviewHarness.client.getChangeDetail(reviewId, new NullProgressMonitor());
 		assertEquals(false, changeDetail.isStarred());
 
+	}
+
+	private static final String NL = "\n"; //$NON-NLS-1$
+
+	private static final String MODEL_ELEMENT_TAG_NAME = "Model-Element"; //$NON-NLS-1$
+
+	@Test
+	public void testCommentsWithEmfModelLocation() throws Exception {
+		String description = "Some comment" + NL + NL + //$NON-NLS-1$
+				"Some description" + NL;//$NON-NLS-1$
+		String uriFragment = "myUriFragment"; //$NON-NLS-1$
+		String rawMessage1 = description + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment; //$NON-NLS-1$
+		reviewHarness.client.publishComments(reviewHarness.shortId, 1, rawMessage1,
+				Collections.<ApprovalCategoryValue.Id> emptySet(), null);
+		reviewHarness.consumer.retrieve(false);
+		reviewHarness.listener.waitForResponse();
+
+		List<IComment> comments = getReview().getComments();
+		int offset = getCommentOffset();
+
+		IComment comment1 = comments.get(offset + 0);
+		// assert that the description is only the message without
+		// the tag for the model element uri fragment
+		assertThat(comment1.getDescription(), is(description));
+		// assert that there is one IEmfModelLocation
+		assertThat(comment1.getLocations().size(), is(1));
+		ILocation location1 = comment1.getLocations().get(0);
+		assertThat(location1, instanceOf(IEmfModelLocation.class));
+		// assert that there is one uri fragment in this location
+		// and that this location is the original uri fragment
+		IEmfModelLocation emfLocation1 = (IEmfModelLocation) location1;
+		assertThat(emfLocation1.getUriFragments().size(), is(1));
+		assertThat(emfLocation1.getUriFragments().get(0), is(uriFragment));
 	}
 
 	private int getCommentOffset() throws GerritException {

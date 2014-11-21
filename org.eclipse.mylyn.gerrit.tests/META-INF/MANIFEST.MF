@@ -36,7 +36,8 @@ Import-Package: com.google.gerrit.common.data;version="2.1.5",
  com.google.gwtjsonrpc.client.impl.ser;version="1.2.4",
  com.google.gwtjsonrpc.server;version="1.2.4",
  com.google.gwtorm.client;version="1.1.4",
- org.apache.commons.io;version="1.4.0"
+ org.apache.commons.io;version="1.4.0",
+ org.eclipse.mylyn.reviews.core.model
 Export-Package: org.eclipse.mylyn.gerrit.tests;x-internal:=true,
  org.eclipse.mylyn.gerrit.tests.core;x-internal:=true,
  org.eclipse.mylyn.gerrit.tests.core.client;x-internal:=true,
