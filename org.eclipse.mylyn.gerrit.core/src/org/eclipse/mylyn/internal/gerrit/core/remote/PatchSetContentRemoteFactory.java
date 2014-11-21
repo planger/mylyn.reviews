@@ -14,6 +14,8 @@ package org.eclipse.mylyn.internal.gerrit.core.remote;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -26,6 +28,7 @@ import org.eclipse.mylyn.internal.gerrit.core.client.GerritException;
 import org.eclipse.mylyn.internal.gerrit.core.client.PatchSetContent;
 import org.eclipse.mylyn.internal.gerrit.core.client.compat.PatchScriptX;
 import org.eclipse.mylyn.reviews.core.model.IComment;
+import org.eclipse.mylyn.reviews.core.model.IEmfModelLocation;
 import org.eclipse.mylyn.reviews.core.model.IFileItem;
 import org.eclipse.mylyn.reviews.core.model.IFileVersion;
 import org.eclipse.mylyn.reviews.core.model.ILineLocation;
@@ -45,12 +48,12 @@ import com.google.gerrit.reviewdb.PatchLineComment;
 
 /**
  * Manages retrieval of patch set contents, including file versions and associated comments, from Gerrit API.
- * 
+ *
  * @author Miles Parker
  * @author Steffen Pingel
  */
 public abstract class PatchSetContentRemoteFactory<RemoteKeyType> extends
-		ReviewItemSetContentRemoteFactory<PatchSetContent, RemoteKeyType> {
+ReviewItemSetContentRemoteFactory<PatchSetContent, RemoteKeyType> {
 
 	private final ReviewItemCache cache;
 
@@ -75,7 +78,7 @@ public abstract class PatchSetContentRemoteFactory<RemoteKeyType> extends
 			if (patchScript == null) {
 				throw new CoreException(new Status(IStatus.ERROR, GerritCorePlugin.PLUGIN_ID,
 						"Couldn't obtain patch information for patch set " + patch.getKey() //$NON-NLS-1$
-								+ ". Check remote connection.")); //$NON-NLS-1$
+						+ ". Check remote connection.")); //$NON-NLS-1$
 			}
 			CommentDetail commentDetail = patchScript.getCommentDetail();
 			List<PatchLineComment> comments = new ArrayList<PatchLineComment>();
@@ -120,12 +123,41 @@ public abstract class PatchSetContentRemoteFactory<RemoteKeyType> extends
 			if (comment.isDraft()) {
 				draftCount++;
 			}
+			searchAndAddModelLocations(comment);
 			comment.setAuthor(author);
 			comment.getLocations().add(location);
 			version.getComments().add(comment);
 		}
 		changed |= draftCount != oldDraftCount;
 		return changed;
+	}
+
+	private void searchAndAddModelLocations(IComment comment) {
+		for (String uriFragment : getModelElementUriFragments(comment.getDescription())) {
+			IEmfModelLocation modelLocation = IReviewsFactory.INSTANCE.createEmfModelLocation();
+			modelLocation.getUriFragments().add(uriFragment);
+			comment.getLocations().add(modelLocation);
+		}
+	}
+
+	private List<String> getModelElementUriFragments(String description) {
+		final List<String> modelElementUriFragments = new ArrayList<String>();
+		final String tagName = "Model-Element"; //$NON-NLS-1$
+		final String tagMatchRegEx = tagName + "\\s*:\\s*(.*)$"; //$NON-NLS-1$
+		final String separator = ","; //$NON-NLS-1$
+		final Pattern pattern = Pattern.compile(tagMatchRegEx);
+		final Matcher matcher = pattern.matcher(description);
+		while (matcher.find()) {
+			final String match = matcher.group(1);
+			final String[] fragments = match.split(separator);
+			for (String fragment : fragments) {
+				final String trimmedFragment = fragment.trim();
+				if (!trimmedFragment.isEmpty()) {
+					modelElementUriFragments.add(trimmedFragment);
+				}
+			}
+		}
+		return modelElementUriFragments;
 	}
 
 	@Override
@@ -143,65 +175,65 @@ public abstract class PatchSetContentRemoteFactory<RemoteKeyType> extends
 			String targetId = patch.getKey().toString();
 			String sourceFileName = (patch.getSourceFileName() != null)
 					? patch.getSourceFileName()
-					: patch.getFileName();
-			String baseId = (content.getBase() != null)
-					? new Patch.Key(content.getBase().getId(), sourceFileName).toString()
-					: "base-" + targetId; //$NON-NLS-1$
-			String id = baseId + ":" + targetId; //$NON-NLS-1$
-			IFileItem item = (IFileItem) getCache().getItem(id);
-			if (item == null) {
-				item = IReviewsFactory.INSTANCE.createFileItem();
-				item.setId(id);
-				item.setName(patch.getFileName());
-				item.setAddedBy(set.getAddedBy());
-				item.setCommittedBy(set.getCommittedBy());
-				item.setReference(patch.getKey().getParentKey() + "," + patch.getFileName()); //$NON-NLS-1$
-				getCache().put(item);
-			}
-			items.add(item);
+							: patch.getFileName();
+					String baseId = (content.getBase() != null)
+							? new Patch.Key(content.getBase().getId(), sourceFileName).toString()
+									: "base-" + targetId; //$NON-NLS-1$
+							String id = baseId + ":" + targetId; //$NON-NLS-1$
+							IFileItem item = (IFileItem) getCache().getItem(id);
+							if (item == null) {
+								item = IReviewsFactory.INSTANCE.createFileItem();
+								item.setId(id);
+								item.setName(patch.getFileName());
+								item.setAddedBy(set.getAddedBy());
+								item.setCommittedBy(set.getCommittedBy());
+								item.setReference(patch.getKey().getParentKey() + "," + patch.getFileName()); //$NON-NLS-1$
+								getCache().put(item);
+							}
+							items.add(item);
 
-			PatchScriptX patchScript = content.getPatchScript(patch.getKey());
-			if (patchScript != null) {
-				IFileVersion baseVersion = (IFileVersion) getCache().getItem(baseId);
-				if (baseVersion == null) {
-					baseVersion = IReviewsFactory.INSTANCE.createFileVersion();
-					baseVersion.setId(baseId);
-					if (patchScript.isBinary()) {
-						baseVersion.setBinaryContent(patchScript.getBinaryA());
-					} else {
-						baseVersion.setContent(patchScript.getA().asString());
-					}
-					baseVersion.setPath(patchScript.getA().getPath());
-					baseVersion.setDescription((content.getBase() != null)
-							? NLS.bind(Messages.PatchSetContentRemoteFactory_Patch_Set, content.getBase()
-									.getPatchSetId()) : Messages.PatchSetContentRemoteFactory_Base);
-					baseVersion.setFile(item);
-					baseVersion.setName(item.getName());
-					getCache().put(baseVersion);
-				}
-				item.setBase(baseVersion);
+							PatchScriptX patchScript = content.getPatchScript(patch.getKey());
+							if (patchScript != null) {
+								IFileVersion baseVersion = (IFileVersion) getCache().getItem(baseId);
+								if (baseVersion == null) {
+									baseVersion = IReviewsFactory.INSTANCE.createFileVersion();
+									baseVersion.setId(baseId);
+									if (patchScript.isBinary()) {
+										baseVersion.setBinaryContent(patchScript.getBinaryA());
+									} else {
+										baseVersion.setContent(patchScript.getA().asString());
+									}
+									baseVersion.setPath(patchScript.getA().getPath());
+									baseVersion.setDescription((content.getBase() != null)
+											? NLS.bind(Messages.PatchSetContentRemoteFactory_Patch_Set, content.getBase()
+													.getPatchSetId()) : Messages.PatchSetContentRemoteFactory_Base);
+									baseVersion.setFile(item);
+									baseVersion.setName(item.getName());
+									getCache().put(baseVersion);
+								}
+								item.setBase(baseVersion);
 
-				IFileVersion targetVersion = (IFileVersion) getCache().getItem(targetId);
-				if (targetVersion == null) {
-					targetVersion = IReviewsFactory.INSTANCE.createFileVersion();
-					targetVersion.setId(targetId);
-					SparseFileContent target = patchScript.getB().apply(patchScript.getA(), patchScript.getEdits());
-					if (patchScript.isBinary()) {
-						targetVersion.setBinaryContent(patchScript.getBinaryB());
-					} else {
-						targetVersion.setContent(target.asString());
-					}
-					targetVersion.setPath(patchScript.getB().getPath());
-					targetVersion.setDescription(NLS.bind(Messages.PatchSetContentRemoteFactory_Patch_Set,
-							content.getTargetDetail().getPatchSet().getPatchSetId()));
-					targetVersion.setFile(item);
-					targetVersion.setAddedBy(item.getAddedBy());
-					targetVersion.setCommittedBy(item.getCommittedBy());
-					targetVersion.setName(item.getName());
-					getCache().put(targetVersion);
-				}
-				item.setTarget(targetVersion);
-			}
+								IFileVersion targetVersion = (IFileVersion) getCache().getItem(targetId);
+								if (targetVersion == null) {
+									targetVersion = IReviewsFactory.INSTANCE.createFileVersion();
+									targetVersion.setId(targetId);
+									SparseFileContent target = patchScript.getB().apply(patchScript.getA(), patchScript.getEdits());
+									if (patchScript.isBinary()) {
+										targetVersion.setBinaryContent(patchScript.getBinaryB());
+									} else {
+										targetVersion.setContent(target.asString());
+									}
+									targetVersion.setPath(patchScript.getB().getPath());
+									targetVersion.setDescription(NLS.bind(Messages.PatchSetContentRemoteFactory_Patch_Set,
+											content.getTargetDetail().getPatchSet().getPatchSetId()));
+									targetVersion.setFile(item);
+									targetVersion.setAddedBy(item.getAddedBy());
+									targetVersion.setCommittedBy(item.getCommittedBy());
+									targetVersion.setName(item.getName());
+									getCache().put(targetVersion);
+								}
+								item.setTarget(targetVersion);
+							}
 		}
 		return items;
 	}

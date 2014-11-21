@@ -23,6 +23,7 @@ import org.eclipse.mylyn.internal.gerrit.core.operations.GerritOperation;
 import org.eclipse.mylyn.internal.gerrit.core.operations.SaveDraftRequest;
 import org.eclipse.mylyn.internal.gerrit.ui.egit.GitFileRevisionUtils;
 import org.eclipse.mylyn.reviews.core.model.IComment;
+import org.eclipse.mylyn.reviews.core.model.IEmfModelLocation;
 import org.eclipse.mylyn.reviews.core.model.IFileVersion;
 import org.eclipse.mylyn.reviews.core.model.ILineLocation;
 import org.eclipse.mylyn.reviews.core.model.ILocation;
@@ -77,22 +78,28 @@ public class GerritReviewBehavior extends ReviewBehavior {
 		for (ILocation location : comment.getLocations()) {
 			if (location instanceof ILineLocation) {
 				ILineLocation lineLocation = (ILineLocation) location;
-				SaveDraftRequest request = new SaveDraftRequest(key, lineLocation.getRangeMin(), side, null,
-						Strings.emptyToNull(comment.getId()));
-				request.setMessage(comment.getDescription());
-
-				GerritOperation<PatchLineComment> operation = getOperationFactory().createOperation(getTask(), request);
-				IStatus status = operation.run(monitor);
-				PatchLineComment patchLineComment = operation.getOperationResult();
-				// save the value of uuid, and keep it with the comment
-				if (patchLineComment != null && patchLineComment.getKey() != null) {
-					comment.setId(patchLineComment.getKey().get());
-				}
-				return status;
+				return saveDraftRequest(key, comment, lineLocation.getRangeMin(), side, monitor);
+			} else if (location instanceof IEmfModelLocation) {
+				return saveDraftRequest(key, comment, 0, side, monitor);
 			}
 		}
 		//We'll only get here if there is something really broken in calling code or model. Gerrit has one and only one comment per location.
 		throw new RuntimeException(NLS.bind(Messages.GerritReviewBehavior_Internal_Exception, comment.getId()));
+	}
+
+	private IStatus saveDraftRequest(Patch.Key key, IComment comment, final int line, short side,
+			IProgressMonitor monitor) {
+		SaveDraftRequest request = new SaveDraftRequest(key, line, side, null, Strings.emptyToNull(comment.getId()));
+		request.setMessage(comment.getDescription());
+
+		GerritOperation<PatchLineComment> operation = getOperationFactory().createOperation(getTask(), request);
+		IStatus status = operation.run(monitor);
+		PatchLineComment patchLineComment = operation.getOperationResult();
+		// save the value of uuid, and keep it with the comment
+		if (patchLineComment != null && patchLineComment.getKey() != null) {
+			comment.setId(patchLineComment.getKey().get());
+		}
+		return status;
 	}
 
 	@Override
@@ -106,8 +113,7 @@ public class GerritReviewBehavior extends ReviewBehavior {
 		}
 		Patch.Key key = Patch.Key.parse(id);
 		for (ILocation location : comment.getLocations()) {
-			if (location instanceof ILineLocation) {
-				ILineLocation lineLocation = (ILineLocation) location;
+			if (location instanceof ILineLocation || location instanceof IEmfModelLocation) {
 				DiscardDraftRequest request = new DiscardDraftRequest(key, comment.getId());
 				request.setMessage(comment.getDescription());
 

@@ -25,7 +25,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -41,14 +43,19 @@ import org.eclipse.mylyn.internal.gerrit.core.client.GerritException;
 import org.eclipse.mylyn.internal.gerrit.core.client.PatchSetContent;
 import org.eclipse.mylyn.internal.gerrit.core.client.compat.PatchScriptX;
 import org.eclipse.mylyn.reviews.core.model.IComment;
+import org.eclipse.mylyn.reviews.core.model.IEmfModelLocation;
 import org.eclipse.mylyn.reviews.core.model.IFileItem;
 import org.eclipse.mylyn.reviews.core.model.IFileVersion;
+import org.eclipse.mylyn.reviews.core.model.ILocation;
 import org.eclipse.mylyn.reviews.core.model.IReview;
 import org.eclipse.mylyn.reviews.core.model.IReviewItem;
 import org.eclipse.mylyn.reviews.core.model.IReviewItemSet;
 import org.hamcrest.Matcher;
 import org.junit.Test;
 
+import com.google.common.base.Predicate;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Iterators;
 import com.google.gerrit.common.data.PatchSetDetail;
 import com.google.gerrit.reviewdb.ApprovalCategoryValue;
 import com.google.gerrit.reviewdb.Change;
@@ -361,6 +368,124 @@ public class PatchSetRemoteFactoryTest extends GerritRemoteTest {
 		// then
 		assertThat(content.getPatchScript(commitMsgPatchKey), notNullValue());
 		assertThat(content.getPatchScript(testFilePatchKey), notNullValue());
+	}
+
+	private static final String NL = "\n"; //$NON-NLS-1$
+
+	private static final String MODEL_ELEMENT_TAG_NAME = "Model-Element"; //$NON-NLS-1$
+
+	@Test
+	public void testCommentsWithOneEmfModelLocation() throws Exception {
+		String description = "Some comment" + NL + NL + "Some description" + NL;
+		String uriFragment = "myUriFragment";
+		String rawDescription = description + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment;
+
+		List<IComment> allComments = commitFileAndPublishAndRetrieveComment(rawDescription);
+		assertThat(allComments.size(), is(1));
+		IComment fileComment = allComments.get(0);
+		assertThat(fileComment, notNullValue());
+		assertThat(fileComment.getDescription(), is(rawDescription));
+
+		final List<IEmfModelLocation> modelLocations = getModelLocations(fileComment.getLocations());
+		assertThat(modelLocations.size(), is(1));
+
+		IEmfModelLocation emfLocation1 = modelLocations.get(0);
+		assertThat(emfLocation1.getUriFragments().size(), is(1));
+		assertThat(emfLocation1.getUriFragments().get(0), is(uriFragment));
+	}
+
+	@Test
+	public void testCommentsWithTwoSeparateEmfModelLocations() throws Exception {
+		String description = "Some comment" + NL + NL + "Some description" + NL;
+		String uriFragment1 = "myUriFragment1";
+		String uriFragment2 = "myUriFragment2";
+		String rawDescription = description + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment1 + NL;
+		rawDescription = rawDescription + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment2;
+
+		List<IComment> allComments = commitFileAndPublishAndRetrieveComment(rawDescription);
+		assertThat(allComments.size(), is(1));
+		IComment fileComment = allComments.get(0);
+		assertThat(fileComment, notNullValue());
+		assertThat(fileComment.getDescription(), is(rawDescription));
+
+		final List<IEmfModelLocation> modelLocations = getModelLocations(fileComment.getLocations());
+		assertThat(modelLocations.size(), is(2));
+
+		IEmfModelLocation emfLocation1 = modelLocations.get(0);
+		assertThat(emfLocation1.getUriFragments().size(), is(1));
+		assertThat(emfLocation1.getUriFragments().get(0), is(uriFragment1));
+
+		IEmfModelLocation emfLocation2 = modelLocations.get(1);
+		assertThat(emfLocation2.getUriFragments().size(), is(1));
+		assertThat(emfLocation2.getUriFragments().get(0), is(uriFragment2));
+	}
+
+	@Test
+	public void testCommentsWithTwoListedEmfModelLocations() throws Exception {
+		String description = "Some comment" + NL + NL + "Some description" + NL;
+		String uriFragment1 = "myUriFragment1";
+		String uriFragment2 = "myUriFragment2";
+		String rawDescription = description + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment1 + ", " + uriFragment2;
+
+		List<IComment> allComments = commitFileAndPublishAndRetrieveComment(rawDescription);
+		assertThat(allComments.size(), is(1));
+		IComment fileComment = allComments.get(0);
+		assertThat(fileComment, notNullValue());
+		assertThat(fileComment.getDescription(), is(rawDescription));
+
+		final List<IEmfModelLocation> modelLocations = getModelLocations(fileComment.getLocations());
+		assertThat(modelLocations.size(), is(2));
+
+		IEmfModelLocation emfLocation1 = modelLocations.get(0);
+		assertThat(emfLocation1.getUriFragments().size(), is(1));
+		assertThat(emfLocation1.getUriFragments().get(0), is(uriFragment1));
+
+		IEmfModelLocation emfLocation2 = modelLocations.get(1);
+		assertThat(emfLocation2.getUriFragments().size(), is(1));
+		assertThat(emfLocation2.getUriFragments().get(0), is(uriFragment2));
+	}
+
+	private List<IComment> commitFileAndPublishAndRetrieveComment(String fileComment) throws Exception, GerritException {
+		CommitCommand commitCommand = reviewHarness.createCommitCommand();
+		reviewHarness.addFile("testComments.txt", "line1\nline2\nline3\nline4");
+		reviewHarness.commitAndPush(commitCommand);
+		reviewHarness.consumer.retrieve(false);
+		reviewHarness.listener.waitForResponse();
+		PatchSetDetail detail = retrievePatchSetDetail("2");
+		assertThat(detail.getInfo().getKey().get(), is(2));
+
+		IReviewItemSet testPatchSet = getReview().getSets().get(1);
+		TestRemoteObserverConsumer<IReviewItemSet, List<IFileItem>, String, PatchSetContent, String, Long> patchSetObserver //
+		= retrievePatchSetContents(testPatchSet);
+
+		IFileItem commentFile = testPatchSet.getItems().get(1);
+		assertThat(commentFile.getName(), is("testComments.txt"));
+		assertThat(commentFile.getAllComments().size(), is(0));
+
+		String id = commentFile.getReference();
+		reviewHarness.client.saveDraft(Patch.Key.parse(id), fileComment, 2, (short) 1, null, null,
+				new NullProgressMonitor());
+		patchSetObserver.retrieve(false);
+		patchSetObserver.waitForResponse();
+
+		reviewHarness.client.publishComments(reviewHarness.shortId, 2, "Submit Comments",
+				Collections.<ApprovalCategoryValue.Id> emptySet(), new NullProgressMonitor());
+		patchSetObserver.retrieve(false);
+		patchSetObserver.waitForResponse();
+
+		commentFile = testPatchSet.getItems().get(1);
+		List<IComment> allComments = commentFile.getAllComments();
+		return allComments;
+	}
+
+	private List<IEmfModelLocation> getModelLocations(List<ILocation> locations) {
+		final List<IEmfModelLocation> modelLocations = new ArrayList<IEmfModelLocation>();
+		final Predicate<Object> isModelLocation = Predicates.instanceOf(IEmfModelLocation.class);
+		final Iterator<ILocation> modelLocationsIterator = Iterators.filter(locations.iterator(), isModelLocation);
+		while (modelLocationsIterator.hasNext()) {
+			modelLocations.add((IEmfModelLocation) modelLocationsIterator.next());
+		}
+		return modelLocations;
 	}
 
 	private PatchSetDetail retrievePatchSetDetail(String patchSetId) {
