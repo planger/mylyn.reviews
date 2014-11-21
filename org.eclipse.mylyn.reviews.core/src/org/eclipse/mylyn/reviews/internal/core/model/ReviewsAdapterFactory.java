@@ -133,6 +133,11 @@ public class ReviewsAdapterFactory extends AdapterFactoryImpl {
 		}
 
 		@Override
+		public Adapter caseEmfModelLocation(IEmfModelLocation object) {
+			return createEmfModelLocationAdapter();
+		}
+
+		@Override
 		public Adapter caseFileVersion(IFileVersion object) {
 			return createFileVersionAdapter();
 		}
@@ -344,6 +349,20 @@ public class ReviewsAdapterFactory extends AdapterFactoryImpl {
 	 * @generated
 	 */
 	public Adapter createLineRangeAdapter() {
+		return null;
+	}
+
+	/**
+	 * Creates a new adapter for an object of class '{@link org.eclipse.mylyn.reviews.core.model.IEmfModelLocation <em>Emf Model Location</em>}'.
+	 * <!-- begin-user-doc -->
+	 * This default implementation returns null so that we can easily ignore cases;
+	 * it's useful to ignore a case when inheritance will catch all the cases anyway.
+	 * <!-- end-user-doc -->
+	 * @return the new adapter.
+	 * @see org.eclipse.mylyn.reviews.core.model.IEmfModelLocation
+	 * @generated
+	 */
+	public Adapter createEmfModelLocationAdapter() {
 		return null;
 	}
 

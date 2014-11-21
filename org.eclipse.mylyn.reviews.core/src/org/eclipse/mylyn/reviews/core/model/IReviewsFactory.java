@@ -89,6 +89,14 @@ public interface IReviewsFactory {
 	ILineRange createLineRange();
 
 	/**
+	 * Returns a new object of class '<em>Emf Model Location</em>'. <!-- begin-user-doc --> <!-- end-user-doc -->
+	 * 
+	 * @return a new object of class '<em>Emf Model Location</em>'.
+	 * @generated
+	 */
+	IEmfModelLocation createEmfModelLocation();
+
+	/**
 	 * Returns a new object of class '<em>File Version</em>'. <!-- begin-user-doc --> <!-- end-user-doc -->
 	 * 
 	 * @return a new object of class '<em>File Version</em>'.

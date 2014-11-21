@@ -88,6 +88,8 @@ public class ReviewsFactory extends EFactoryImpl implements IReviewsFactory {
 			return createLineLocation();
 		case ReviewsPackage.LINE_RANGE:
 			return createLineRange();
+		case ReviewsPackage.EMF_MODEL_LOCATION:
+			return createEmfModelLocation();
 		case ReviewsPackage.FILE_VERSION:
 			return createFileVersion();
 		case ReviewsPackage.APPROVAL_TYPE:
@@ -219,6 +221,16 @@ public class ReviewsFactory extends EFactoryImpl implements IReviewsFactory {
 	public ILineRange createLineRange() {
 		LineRange lineRange = new LineRange();
 		return lineRange;
+	}
+
+	/**
+	 * <!-- begin-user-doc -->
+	 * <!-- end-user-doc -->
+	 * @generated
+	 */
+	public IEmfModelLocation createEmfModelLocation() {
+		EmfModelLocation emfModelLocation = new EmfModelLocation();
+		return emfModelLocation;
 	}
 
 	/**
