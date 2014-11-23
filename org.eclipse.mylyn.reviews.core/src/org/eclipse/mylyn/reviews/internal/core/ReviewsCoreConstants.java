@@ -14,4 +14,6 @@ package org.eclipse.mylyn.reviews.internal.core;
 public interface ReviewsCoreConstants {
 
 	public static final String PLUGIN_ID = "org.eclipse.mylyn.reviews.core"; //$NON-NLS-1$
+
+	public static final String MODEL_ELEMENT_TAG = "Model-Element"; //$NON-NLS-1$
 }

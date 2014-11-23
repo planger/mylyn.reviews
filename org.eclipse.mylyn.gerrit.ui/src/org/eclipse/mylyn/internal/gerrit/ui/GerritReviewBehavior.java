@@ -13,6 +13,9 @@
 
 package org.eclipse.mylyn.internal.gerrit.ui;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.jgit.lib.Repository;
@@ -28,6 +31,8 @@ import org.eclipse.mylyn.reviews.core.model.IFileVersion;
 import org.eclipse.mylyn.reviews.core.model.ILineLocation;
 import org.eclipse.mylyn.reviews.core.model.ILocation;
 import org.eclipse.mylyn.reviews.core.model.IReviewItem;
+import org.eclipse.mylyn.reviews.internal.core.ReviewsCoreConstants;
+import org.eclipse.mylyn.reviews.internal.core.TaggedDescription;
 import org.eclipse.mylyn.reviews.ui.ReviewBehavior;
 import org.eclipse.mylyn.tasks.core.ITask;
 import org.eclipse.osgi.util.NLS;
@@ -65,6 +70,7 @@ public class GerritReviewBehavior extends ReviewBehavior {
 		return GerritUiPlugin.getDefault().getOperationFactory();
 	}
 
+	@SuppressWarnings("restriction")
 	@Override
 	public IStatus addComment(IReviewItem item, IComment comment, IProgressMonitor monitor) {
 		short side = RIGHT_SIDE;
@@ -80,7 +86,18 @@ public class GerritReviewBehavior extends ReviewBehavior {
 				ILineLocation lineLocation = (ILineLocation) location;
 				return saveDraftRequest(key, comment, lineLocation.getRangeMin(), side, monitor);
 			} else if (location instanceof IEmfModelLocation) {
-				return saveDraftRequest(key, comment, 0, side, monitor);
+				final int defaultModelLocationLine = 0;
+				final IEmfModelLocation modelLocation = (IEmfModelLocation) location;
+				final String modelLocationTag = ReviewsCoreConstants.MODEL_ELEMENT_TAG;
+				final List<String> tags = Arrays.asList(new String[] { modelLocationTag });
+				final String commentDescription = comment.getDescription();
+				final TaggedDescription taggedDescription = new TaggedDescription(commentDescription, tags);
+				taggedDescription.removeTag(modelLocationTag);
+				for (String uriFragment : modelLocation.getUriFragments()) {
+					taggedDescription.addTagValue(modelLocationTag, uriFragment);
+				}
+				comment.setDescription(taggedDescription.getTaggedDescription());
+				return saveDraftRequest(key, comment, defaultModelLocationLine, side, monitor);
 			}
 		}
 		//We'll only get here if there is something really broken in calling code or model. Gerrit has one and only one comment per location.

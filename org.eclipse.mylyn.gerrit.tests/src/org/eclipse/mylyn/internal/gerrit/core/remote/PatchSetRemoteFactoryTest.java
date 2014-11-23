@@ -50,6 +50,7 @@ import org.eclipse.mylyn.reviews.core.model.ILocation;
 import org.eclipse.mylyn.reviews.core.model.IReview;
 import org.eclipse.mylyn.reviews.core.model.IReviewItem;
 import org.eclipse.mylyn.reviews.core.model.IReviewItemSet;
+import org.eclipse.mylyn.reviews.internal.core.ReviewsCoreConstants;
 import org.hamcrest.Matcher;
 import org.junit.Test;
 
@@ -370,15 +371,13 @@ public class PatchSetRemoteFactoryTest extends GerritRemoteTest {
 		assertThat(content.getPatchScript(testFilePatchKey), notNullValue());
 	}
 
-	private static final String NL = "\n"; //$NON-NLS-1$
-
-	private static final String MODEL_ELEMENT_TAG_NAME = "Model-Element"; //$NON-NLS-1$
+	private static final String NL = System.getProperty("line.separator"); //$NON-NLS-1$
 
 	@Test
 	public void testCommentsWithOneEmfModelLocation() throws Exception {
 		String description = "Some comment" + NL + NL + "Some description" + NL;
 		String uriFragment = "myUriFragment";
-		String rawDescription = description + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment;
+		String rawDescription = description + ReviewsCoreConstants.MODEL_ELEMENT_TAG + ": " + uriFragment;
 
 		List<IComment> allComments = commitFileAndPublishAndRetrieveComment(rawDescription);
 		assertThat(allComments.size(), is(1));
@@ -399,33 +398,8 @@ public class PatchSetRemoteFactoryTest extends GerritRemoteTest {
 		String description = "Some comment" + NL + NL + "Some description" + NL;
 		String uriFragment1 = "myUriFragment1";
 		String uriFragment2 = "myUriFragment2";
-		String rawDescription = description + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment1 + NL;
-		rawDescription = rawDescription + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment2;
-
-		List<IComment> allComments = commitFileAndPublishAndRetrieveComment(rawDescription);
-		assertThat(allComments.size(), is(1));
-		IComment fileComment = allComments.get(0);
-		assertThat(fileComment, notNullValue());
-		assertThat(fileComment.getDescription(), is(rawDescription));
-
-		final List<IEmfModelLocation> modelLocations = getModelLocations(fileComment.getLocations());
-		assertThat(modelLocations.size(), is(2));
-
-		IEmfModelLocation emfLocation1 = modelLocations.get(0);
-		assertThat(emfLocation1.getUriFragments().size(), is(1));
-		assertThat(emfLocation1.getUriFragments().get(0), is(uriFragment1));
-
-		IEmfModelLocation emfLocation2 = modelLocations.get(1);
-		assertThat(emfLocation2.getUriFragments().size(), is(1));
-		assertThat(emfLocation2.getUriFragments().get(0), is(uriFragment2));
-	}
-
-	@Test
-	public void testCommentsWithTwoListedEmfModelLocations() throws Exception {
-		String description = "Some comment" + NL + NL + "Some description" + NL;
-		String uriFragment1 = "myUriFragment1";
-		String uriFragment2 = "myUriFragment2";
-		String rawDescription = description + MODEL_ELEMENT_TAG_NAME + ": " + uriFragment1 + ", " + uriFragment2;
+		String rawDescription = description + ReviewsCoreConstants.MODEL_ELEMENT_TAG + ": " + uriFragment1 + NL;
+		rawDescription = rawDescription + ReviewsCoreConstants.MODEL_ELEMENT_TAG + ": " + uriFragment2;
 
 		List<IComment> allComments = commitFileAndPublishAndRetrieveComment(rawDescription);
 		assertThat(allComments.size(), is(1));

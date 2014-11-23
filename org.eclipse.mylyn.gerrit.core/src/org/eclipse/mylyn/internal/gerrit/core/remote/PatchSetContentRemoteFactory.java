@@ -13,9 +13,8 @@
 package org.eclipse.mylyn.internal.gerrit.core.remote;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -33,10 +32,13 @@ import org.eclipse.mylyn.reviews.core.model.IFileItem;
 import org.eclipse.mylyn.reviews.core.model.IFileVersion;
 import org.eclipse.mylyn.reviews.core.model.ILineLocation;
 import org.eclipse.mylyn.reviews.core.model.ILineRange;
+import org.eclipse.mylyn.reviews.core.model.ILocation;
 import org.eclipse.mylyn.reviews.core.model.IReviewItemSet;
 import org.eclipse.mylyn.reviews.core.model.IReviewsFactory;
 import org.eclipse.mylyn.reviews.core.model.IUser;
 import org.eclipse.mylyn.reviews.core.spi.remote.review.ReviewItemSetContentRemoteFactory;
+import org.eclipse.mylyn.reviews.internal.core.ReviewsCoreConstants;
+import org.eclipse.mylyn.reviews.internal.core.TaggedDescription;
 import org.eclipse.osgi.util.NLS;
 
 import com.google.gerrit.common.data.AccountInfoCache;
@@ -123,41 +125,38 @@ ReviewItemSetContentRemoteFactory<PatchSetContent, RemoteKeyType> {
 			if (comment.isDraft()) {
 				draftCount++;
 			}
-			searchAndAddModelLocations(comment);
 			comment.setAuthor(author);
 			comment.getLocations().add(location);
+			searchAndAddModelLocations(comment);
 			version.getComments().add(comment);
 		}
 		changed |= draftCount != oldDraftCount;
 		return changed;
 	}
 
+	@SuppressWarnings("restriction")
 	private void searchAndAddModelLocations(IComment comment) {
-		for (String uriFragment : getModelElementUriFragments(comment.getDescription())) {
+		boolean addedModelLocations = false;
+		final String modelLocationTag = ReviewsCoreConstants.MODEL_ELEMENT_TAG;
+		final List<String> tags = Arrays.asList(new String[] { modelLocationTag });
+		final TaggedDescription taggedDescription = new TaggedDescription(comment.getDescription(), tags);
+		for (String uriFragment : taggedDescription.getTagValues(modelLocationTag)) {
 			IEmfModelLocation modelLocation = IReviewsFactory.INSTANCE.createEmfModelLocation();
 			modelLocation.getUriFragments().add(uriFragment);
 			comment.getLocations().add(modelLocation);
+			addedModelLocations = true;
+		}
+		if (addedModelLocations) {
+			removeAllLineLocations(comment);
 		}
 	}
 
-	private List<String> getModelElementUriFragments(String description) {
-		final List<String> modelElementUriFragments = new ArrayList<String>();
-		final String tagName = "Model-Element"; //$NON-NLS-1$
-		final String tagMatchRegEx = tagName + "\\s*:\\s*(.*)$"; //$NON-NLS-1$
-		final String separator = ","; //$NON-NLS-1$
-		final Pattern pattern = Pattern.compile(tagMatchRegEx);
-		final Matcher matcher = pattern.matcher(description);
-		while (matcher.find()) {
-			final String match = matcher.group(1);
-			final String[] fragments = match.split(separator);
-			for (String fragment : fragments) {
-				final String trimmedFragment = fragment.trim();
-				if (!trimmedFragment.isEmpty()) {
-					modelElementUriFragments.add(trimmedFragment);
-				}
+	private void removeAllLineLocations(IComment comment) {
+		for (ILocation location : new ArrayList<ILocation>(comment.getLocations())) {
+			if (location instanceof ILineLocation) {
+				comment.getLocations().remove(location);
 			}
 		}
-		return modelElementUriFragments;
 	}
 
 	@Override
