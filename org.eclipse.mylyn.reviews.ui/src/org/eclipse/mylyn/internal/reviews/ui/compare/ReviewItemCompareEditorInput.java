@@ -10,6 +10,7 @@
  *     Tasktop Technologies - improvements
  *     Sebastien Dubois (Ericsson) - Improvements for bug 400266
  *     Guy Perron (Ericsson) - Bug 422673 Insert annotation navigation
+ *     Alexandra Buzila - model review support
  ******************************************************************************/
 
 package org.eclipse.mylyn.internal.reviews.ui.compare;
@@ -24,6 +25,8 @@ import org.eclipse.compare.structuremergeviewer.IDiffElement;
 import org.eclipse.compare.structuremergeviewer.StructureDiffViewer;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.emf.compare.ide.ui.internal.contentmergeviewer.label.WaitContentViewer;
+import org.eclipse.emf.compare.ide.ui.internal.structuremergeviewer.provider.TreeNodeCompareInput;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.ToolBarManager;
 import org.eclipse.jface.viewers.LabelProvider;
@@ -42,6 +45,7 @@ import org.eclipse.swt.widgets.Composite;
  * @author Miles Parker
  * @author Guy Perron
  * @author Jacques Bouthillier
+ * @author Alexandra Buzila
  */
 public abstract class ReviewItemCompareEditorInput extends CompareEditorInput {
 
@@ -52,6 +56,8 @@ public abstract class ReviewItemCompareEditorInput extends CompareEditorInput {
 	private static final String ID_PREVIOUS_COMMENT = ReviewsUiPlugin.PLUGIN_ID + "navigate.comment.previous"; //$NON-NLS-1$
 
 	final ReviewBehavior behavior;
+
+	private ICompareInput modelFileItemNode;
 
 	public ReviewItemCompareEditorInput(CompareConfiguration configuration, ReviewBehavior behavior) {
 		super(configuration);
@@ -96,10 +102,18 @@ public abstract class ReviewItemCompareEditorInput extends CompareEditorInput {
 	@Override
 	public Viewer findContentViewer(Viewer oldViewer, ICompareInput input, Composite parent) {
 		Viewer contentViewer = super.findContentViewer(oldViewer, input, parent);
+		if (contentViewer instanceof WaitContentViewer) {
+			modelFileItemNode = input;
+		}
 		if (input instanceof FileItemNode && ((FileItemNode) input).getFileItem() != null) {
 			ReviewCompareAnnotationSupport support = ReviewCompareAnnotationSupport.getAnnotationSupport(contentViewer);
 			support.setReviewItem(((FileItemNode) input).getFileItem(), behavior);
 			initializeGotoCommentHandlers(parent, support);
+		} else if (input instanceof TreeNodeCompareInput
+				&& ((TreeNodeCompareInput) input).getComparisonObject() != null) {
+			ReviewEMFCompareAnnotationSupport support = ReviewEMFCompareAnnotationSupport.getAnnotationSupport(contentViewer);
+			support.setReviewItem(((FileItemNode) modelFileItemNode).getFileItem(), behavior);
+			//TODO: initialize comment navigation handlers
 		}
 		return contentViewer;
 	}
