@@ -12,33 +12,47 @@
 package org.eclipse.mylyn.internal.reviews.ui.compare;
 
 import java.lang.reflect.Field;
+import java.util.List;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.emf.compare.ide.ui.internal.EMFCompareIDEUIPlugin;
 import org.eclipse.emf.compare.ide.ui.internal.contentmergeviewer.EMFCompareContentMergeViewer;
+import org.eclipse.emf.compare.ide.ui.internal.contentmergeviewer.tree.TreeContentMergeViewer;
+import org.eclipse.emf.compare.rcp.ui.internal.contentmergeviewer.annotation.MergeItemAnnotation;
 import org.eclipse.emf.compare.rcp.ui.internal.mergeviewer.impl.TreeMergeViewer;
+import org.eclipse.emf.compare.rcp.ui.internal.mergeviewer.item.impl.MergeViewerItem;
+import org.eclipse.emf.compare.rcp.ui.internal.mergeviewer.item.impl.MergeViewerItem.Container;
 import org.eclipse.emf.compare.rcp.ui.mergeviewer.IMergeViewer;
+import org.eclipse.emf.compare.rcp.ui.mergeviewer.IMergeViewer.MergeViewerSide;
+import org.eclipse.emf.compare.rcp.ui.mergeviewer.item.IMergeViewerItem;
+import org.eclipse.emf.ecore.EObject;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.mylyn.commons.core.StatusHandler;
 import org.eclipse.mylyn.internal.reviews.ui.ReviewsUiPlugin;
 import org.eclipse.mylyn.internal.reviews.ui.annotations.ReviewAnnotationModel;
+import org.eclipse.mylyn.reviews.core.model.IComment;
 import org.eclipse.mylyn.reviews.core.model.IFileItem;
+import org.eclipse.mylyn.reviews.internal.core.ReviewsCoreConstants;
 import org.eclipse.mylyn.reviews.ui.ReviewBehavior;
+import org.eclipse.swt.graphics.Image;
+import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.TreeItem;
 
 /**
  * Class adapted from {@link ReviewAnnotationSupport}
  *
  * @author Alexandra Buzila
  */
+@SuppressWarnings("restriction")
 public class ReviewEMFCompareAnnotationSupport {
 	public static enum Side {
 		LEFT_SIDE, RIGHT_SIDE
 	}
 
 	private static String KEY_ANNOTAION_SUPPORT = ReviewItemSetCompareEditorInput.class.getName();
-
-//	private final CommentPopupDialog commentPopupDialog = null;
 
 	public static ReviewEMFCompareAnnotationSupport getAnnotationSupport(Viewer contentViewer) {
 		ReviewEMFCompareAnnotationSupport support = (ReviewEMFCompareAnnotationSupport) contentViewer.getData(KEY_ANNOTAION_SUPPORT);
@@ -67,6 +81,10 @@ public class ReviewEMFCompareAnnotationSupport {
 	private IMergeViewer leftSourceViewer;
 
 	private IMergeViewer rightSourceViewer;
+
+	private TreeContentMergeViewer treeContentViewer;
+
+	private IFileItem item;
 
 	public ReviewEMFCompareAnnotationSupport(Viewer contentViewer) {
 		this.leftAnnotationModel = new ReviewAnnotationModel();
@@ -119,8 +137,15 @@ public class ReviewEMFCompareAnnotationSupport {
 
 	@SuppressWarnings("restriction")
 	public void install(Viewer contentViewer) {
-		if (contentViewer instanceof EMFCompareContentMergeViewer) {
-			EMFCompareContentMergeViewer treeContentViewer = (EMFCompareContentMergeViewer) contentViewer;
+		if (contentViewer instanceof TreeContentMergeViewer) {
+			treeContentViewer = (TreeContentMergeViewer) contentViewer;
+			treeContentViewer.setContentUpdateListener(new Listener() {
+
+				@Override
+				public void handleEvent(Event event) {
+					updateSourceViewer();
+				}
+			});
 			try {
 				Class<EMFCompareContentMergeViewer> clazz = EMFCompareContentMergeViewer.class;
 				Field declaredField = clazz.getDeclaredField("fLeft"); //$NON-NLS-1$
@@ -140,9 +165,72 @@ public class ReviewEMFCompareAnnotationSupport {
 		}
 	}
 
+	@SuppressWarnings("restriction")
 	public void setReviewItem(IFileItem item, ReviewBehavior behavior) {
+		this.item = item;
 		leftAnnotationModel.setItem(item.getBase(), behavior);
 		rightAnnotationModel.setItem(item.getTarget(), behavior);
+	}
+
+	private void updateSourceViewer() {
+		if (item == null) {
+			return;
+		}
+		if (rightSourceViewer instanceof TreeMergeViewer) {
+			TreeMergeViewer treeMergeViewer = (TreeMergeViewer) rightSourceViewer;
+			TreeItem[] roots = treeMergeViewer.getStructuredViewer().getTree().getItems();
+			updateSourceViewer(treeContentViewer.getExpandedTreeItems(roots), item.getAllComments());
+		}
+	}
+
+	private void updateSourceViewer(List<TreeItem> treeItems, List<IComment> comments) {
+		for (TreeItem treeItem : treeItems) {
+			IComment comment = getComment(treeItem, comments);
+			if (comment != null) {
+				addCommentToTreeItem(treeItem, comment);
+			}
+
+		}
+
+	}
+
+	@SuppressWarnings("restriction")
+	private IComment getComment(TreeItem treeItem, List<IComment> comments) {
+		IComment result = null;
+		for (IComment comment : comments) {
+			MergeViewerItem.Container container = (Container) treeItem.getData();
+			EObject value = (EObject) container.getSideValue(MergeViewerSide.RIGHT);
+			String uriFragment = value.eResource().getURIFragment(value);
+			String parentElement = getCommentParentElement(comment.getDescription());
+			if (uriFragment.equals(parentElement)) {
+				result = comment;
+				break;
+			}
+		}
+		return result;
+	}
+
+	@SuppressWarnings("restriction")
+	private String getCommentParentElement(String description) {
+		int lastIndex = description.lastIndexOf(ReviewsCoreConstants.MODEL_ELEMENT_TAG);
+		final String tagText = ReviewsCoreConstants.MODEL_ELEMENT_TAG + ": ";
+		return description.substring(lastIndex + tagText.length());
+	}
+
+	private void addCommentToTreeItem(TreeItem treeItem, IComment comment) {
+		IMergeViewerItem rightData = (IMergeViewerItem) treeItem.getData();
+		Image image = EMFCompareIDEUIPlugin.getImage("icons/full/eobj16/person.gif"); //$NON-NLS-1$
+
+		MergeItemAnnotation mergeItemAnnotation = new MergeItemAnnotation(image, getAnnotationHeader(comment),
+				comment.getDescription());
+		rightData.setRightAnnotation(mergeItemAnnotation);
+		treeItem.getParent().getParent().layout();
+
+	}
+
+	private String getAnnotationHeader(IComment comment) {
+		String header = comment.getAuthor().getDisplayName() + "  " + comment.getCreationDate() + "\n\n"; //$NON-NLS-1$ //$NON-NLS-2$
+		return header;
 	}
 
 	@SuppressWarnings("restriction")
